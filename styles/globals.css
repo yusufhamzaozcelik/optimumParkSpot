@@ -33,3 +33,12 @@
   width: 90%;
   padding: 0.5rem;
 }
+
+.locate {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  z-index: 10;
+}

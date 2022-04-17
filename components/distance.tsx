@@ -1,8 +1,8 @@
-const commutesPerYear = 260 * 2;
+
 const litresPerKM = 10 / 100; //100 km de ortalama 10 litre benzin harcanır km başı ise 100 e bölünür
 const gasLitreCost = 20;//benzin 20 tl desek
 const litreCostKM = litresPerKM * gasLitreCost;
-const secondsPerDay = 60 * 60 * 24;
+
 
 type DistanceProps = {
   leg: google.maps.DirectionsLeg;
