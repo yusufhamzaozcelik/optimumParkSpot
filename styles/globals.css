@@ -33,12 +33,28 @@
   width: 90%;
   padding: 0.5rem;
 }
+.leftButton{
+  border-radius: 20%;
+  padding: 30px;
+  margin: 15px;
+}
 
 .locate {
-  position: absolute;
+  position:fixed;
   top: 1rem;
   right: 1rem;
-  background: none;
-  border: none;
+  background:none;
+  border:none;
   z-index: 10;
+  cursor: pointer;
+}
+
+.locate:hover{
+ 
+  transform: scale(0.5);
+  transition-duration: 0.5s;
+}
+.txt{
+  font-weight: bold;
+  font-size: large;
 }

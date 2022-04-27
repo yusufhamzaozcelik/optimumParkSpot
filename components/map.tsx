@@ -1,13 +1,13 @@
-import { useState,useMemo,useCallback,useRef } from "react";
+import { useState,useMemo,useCallback,useRef,useEffect } from "react";
 import{
     GoogleMap,
     Marker,
     DirectionsRenderer,
     Circle,
     MarkerClusterer,
+    InfoWindow,
 } from "@react-google-maps/api";
-import Places from "./places"
-import axios from "axios"
+import axios from "axios";
 import Distance from "./distance";
 import React from "react";
 
@@ -15,19 +15,24 @@ type LatLngLiteral=google.maps.LatLngLiteral;
 type DirectionsResult=google.maps.DirectionsResult;
 type MapOptions=google.maps.MapOptions;
 export default function Map(){
-    const [office, setOffice]= useState<LatLngLiteral>();
+    const [didButtonClick,setDidButtonClick]= useState(false);
     const [userPositionlat, setUserPositionlat]= React.useState();
     const [userPositionlng, setUserPositionlng]= React.useState();
     const [directions,setDirections]= useState<DirectionsResult>();
     const mapRef= useRef<GoogleMap>();
+    const [selectedParkSpot,setSelectedParkSpot]=useState(null);
+    const [SelectedParkSpotLetfSide,setSelectedParkSpotLetfSide]=useState(null);
+    const [selectedParkSpotid,setSelectedParkSpotid]=useState(null);
+    const [SelectedParkSpotCapacity,setSelectedParkSpotCapacity]=useState(null);
+    const [SelectedParkSpotDistanceToUser,setSelectedParkSpotDistanceToUser]=useState(null);
+    const [SelectedParkSpotTraficJamToUser,setSelectedParkSpotTraficJamToUser]=useState(null);
+    const [parksFromBackend,setparksFromBackend]= useState([]);
 
-
-    /*const [firebaseMarker,setFirebaseMarker]= React.useState([]);*/
-
-    const panToo=React.useCallback(({lat,lng})=>{
+    const panTooo=React.useCallback(({lat,lng,didclick})=>{
       mapRef.current.panTo({ lat, lng });
       setUserPositionlat(lat);
       setUserPositionlng(lng);
+      setDidButtonClick(didclick);
      
 
       
@@ -38,21 +43,41 @@ export default function Map(){
       );
       const options = useMemo<MapOptions>(
         () => ({  
-            mapId:"4443046534e0be29",  
+            //mapId:"4443046534e0be29",  
           disableDefaultUI: true,
           clickableIcons: false,
         }),
         []
       );
+      
+      const onLoad= useCallback((map)=>(mapRef.current=map), []);// her seferinde haritayı izmite göre konumlandırıyor.
 
-      const onLoad= useCallback((map)=>(mapRef.current=map), []);
-      const parks=useMemo(()=>generateHouses(center),[center]);
+   
+
+     
+ 
+          useEffect(()=>{
+                if(userPositionlat && userPositionlng)
+                {
+                  fetch(`http://127.0.0.1:8000/getparks/?lat=${userPositionlat}&lng=${userPositionlng}`)
+                  .then(response => response.json()).then(data=>setparksFromBackend(data));
+                  console.log(userPositionlat,userPositionlng);
+                }
+                },[userPositionlat,userPositionlng]);
+
+       
+            
+        
       
       
-
+      
+     if(parksFromBackend){
+      
+       parksFromBackend.sort((b,a)=>Number(b["best"])-Number(a["best"]))
+       console.log(parksFromBackend);
+     }
       const fetchDirections =(park:LatLngLiteral)=>{
-      //  if(!office) return;
-        //  if(userPositionlat==null&&userPositionlng==null) return;
+     
         const service= new google.maps.DirectionsService();
          service.route(
            {
@@ -70,14 +95,26 @@ export default function Map(){
       
   return (
         <div className="container">
-            <div className="controls"> 
-                <h1>ARA</h1>
-                <Places setOffice={(position)=>{
-                    setOffice(position);
-                    mapRef.current?.panTo(position);
-                }} />
-              {!office && <p> Lütfen adres seçiniz!!</p>}
-              {directions && <Distance leg={directions.routes[0].legs[0]} />}
+            <div className="controls" style={{overflowY:'auto'}}> 
+                <h1>En İyi Öneriler</h1>
+                
+              {!didButtonClick && <p> Önerileri görebilmek için lütfen neredeyim butonuna basınız!</p>}
+              {didButtonClick && parksFromBackend.map((park,index)=>
+              
+              <button key={index} className="leftButton" onClick={()=>{
+                           setSelectedParkSpotLetfSide(park);
+                           
+                
+                           
+                           mapRef.current.panTo({lat: park["lat"],lng:park["lng"]})
+              }} >
+                           <p className="txt"> Park ID={index}</p>
+                           <p> Bu parkın boş kapasitesi  {park["cap"]}/50</p>
+                           <p>Bu park alanının size olan kuş bakışı uzaklığı={park["km"]}</p>
+                           <p>Bu park alanının trafik yoğunluğu %{park["jam"]}</p>
+                          
+              </button>)
+              }
              </div>
           <div className="map">
               <GoogleMap zoom={10} center={center} onLoad={onLoad} mapContainerClassName="map-container" options={options}>
@@ -91,49 +128,58 @@ export default function Map(){
                    }}/>
                  }
 
-                  <Locate panToo={panToo} />
+                  <Locate panToo={panTooo} />
                  
                   <Marker position={{lat:userPositionlat,lng:userPositionlng}}
                   icon="https://developers.google.com/maps/documentation/javascript/examples/full/images/beachflag.png" />
                  
-                   <MarkerClusterer>
-                       {(clusterer)=>parks.map(park=>
-                       <Marker 
-                         key={park.lat}
-                         position={park}
+                 <MarkerClusterer>
+                      {(clusterer): any => parksFromBackend.map((park,index)=>
+                       <Marker
+        
+                         key={index}
+                         position={{
+                           lat:park["lat"],
+                           lng:park["lng"],
+                         }}
                          clusterer={clusterer}
                          onClick={()=>{
                            fetchDirections(park);
+                           setSelectedParkSpot(park);
+                           setSelectedParkSpotid(index);
+                           setSelectedParkSpotCapacity(park["cap"]);
+                           setSelectedParkSpotDistanceToUser(park["km"]);
+                           setSelectedParkSpotTraficJamToUser(park["jam"]);
                          }}
 
                          />)}
                      </MarkerClusterer> 
+
+
+                     {selectedParkSpot&&(
+                       <InfoWindow 
+                       position={selectedParkSpot}
+                       onCloseClick={()=>{
+                         setSelectedParkSpot(null)
+                         setSelectedParkSpotid(null);
+                         setSelectedParkSpotCapacity(null);
+                         setSelectedParkSpotDistanceToUser(null);
+                         setSelectedParkSpotTraficJamToUser(null);
+                       }}
+                       >
+                         <div>
+                           <h1> Bu park numarası {selectedParkSpotid}</h1>
+                           <p> Bu parkın boş kapasitesi  {SelectedParkSpotCapacity}/50</p>
+                           <p>Bu park alanının size olan kuş bakışı uzaklığı {SelectedParkSpotDistanceToUser}</p>
+                           <p>Bu park alanının trafik yoğunluğu %{SelectedParkSpotTraficJamToUser}</p>
+                         {directions && <Distance leg={directions.routes[0].legs[0]} />}
+                         </div>
+                       </InfoWindow>
+                     )}
                   <Circle center ={{lat:userPositionlat,lng:userPositionlng}} radius={15000} options={closeOptions}/>
                   <Circle center ={{lat:userPositionlat,lng:userPositionlng}} radius={30000} options={middleOptions}/>
                   <Circle center ={{lat:userPositionlat,lng:userPositionlng}} radius={45000} options={farOptions}/>
-                     
-                  {office && (
-                  <>
-                    < Marker position={office}
-                     icon="https://developers.google.com/maps/documentation/javascript/examples/full/images/beachflag.png" />
-
-                     <MarkerClusterer>
-                       {(clusterer)=>parks.map(park=>
-                       <Marker 
-                         key={park.lat}
-                         position={park}
-                         clusterer={clusterer}
-                         onClick={()=>{
-                           fetchDirections(park);
-                         }}
-
-                         />)}
-                     </MarkerClusterer> 
-                   
-                      <Circle center ={office} radius={15000} options={closeOptions}/>
-                      <Circle center ={office} radius={30000} options={middleOptions}/>
-                      <Circle center ={office} radius={45000} options={farOptions}/>
-                  </>) }
+                    
               </GoogleMap>
           </div>
       </div>
@@ -172,60 +218,33 @@ const farOptions={
     fillColor:"#FF5252",
 };
 
-const generateHouses = (position: LatLngLiteral) => {
 
-   
-  const config = {
-    headers:{"Access-Control-Allow-Origin": "*"},
-    crossdomain: true 
-  };
-
-  axios.get('http://127.0.0.1:8000/getparks/?lat=30.0&lng=30.0',config)
-  .then(function (response) {
-    // handle success
-    console.log(response);
-  })
-  .catch(function (error) {
-    // handle error
-    console.log(error);
-  })
-  .then(function () {
-    // always executed
-  });  
-  
-  const _houses: Array<LatLngLiteral> = [];
-    for (let i = 0; i < 100; i++) {
-      const direction = Math.random() < 0.5 ? -2 : 2;
-      _houses.push({
-        lat: position.lat + Math.random() / direction,
-        lng: position.lng + Math.random() / direction,
-      });
-      
-    }
-    return _houses;
-  };
 
   function Locate({ panToo }) {
+    
     return (
       <button
         className="locate"
+        
         onClick={() => {
           navigator.geolocation.getCurrentPosition(
             (positionUser) => {
              
-              console.log(positionUser)
+             
               panToo({
                 lat: positionUser.coords.latitude,
                 lng: positionUser.coords.longitude,
+                didclick:true,
                 
               });
+              
             },
             () => null
           );
           
        }}
       >
-        <img src="./locate.png" alt="" />
+        <img src="./button.png" alt="" />
       </button>
     );
   }
